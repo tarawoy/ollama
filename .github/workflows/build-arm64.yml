@@ -1,0 +1,40 @@
+name: Build Ollama ARM64 for OpenWrt
+
+on:
+  workflow_dispatch: # Memungkinkan Anda menjalankan build secara manual
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake
+
+      - name: Build Ollama Binary
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: 1
+          CC: aarch64-linux-gnu-gcc
+          CXX: aarch64-linux-gnu-g++
+        run: |
+          go generate ./...
+          go build -o ollama-arm64 .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-arm64-binary
+          path: ollama-arm64
