@@ -758,7 +758,9 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheTypeK, kv
 				// Every 6th layer is a global layer, which is the full context size that has already been set. The other
 				// layers are the smaller local (sliding) layers.
 				if (i+1)%gemma3GlobalCacheCount != 0 {
-					kv[i] = uint64(float64(slidingWindow*(embeddingHeadsK+embeddingHeadsV)*headsKV) * bytesPerElement)
+					kvK := uint64(float64(slidingWindow*embeddingHeadsK*headsKV) * bytesPerElementK)
+					kvV := uint64(float64(slidingWindow*embeddingHeadsV*headsKV) * bytesPerElementV)
+					kv[i] = kvK + kvV
 				}
 			}
 		}
@@ -837,7 +839,9 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheTypeK, kv
 	case "gptoss", "gpt-oss":
 		kv = make([]uint64, f.KV().BlockCount())
 		for i := range kv {
-			kv[i] = uint64(float64((embeddingHeadsK+embeddingHeadsV)*headsKV) * bytesPerElement)
+			kvK := uint64(float64(embeddingHeadsK*headsKV) * bytesPerElementK)
+			kvV := uint64(float64(embeddingHeadsV*headsKV) * bytesPerElementV)
+			kv[i] = kvK + kvV
 			if i%2 == 0 {
 				kv[i] *= (uint64(numParallel)*4096 + batch)
 			} else {
