@@ -464,6 +464,13 @@ func (t TensorType) TypeSize() uint64 {
 		return blockSize/2 + blockSize/4 + blockSize/16 + 2
 	case TensorTypeQ8_K:
 		return 4 + blockSize + 2*blockSize/16
+	case tensorTypeTQ1_0:
+		// ggml block_tq1_0 size:
+		// sizeof(ggml_half) + QK_K/64 + (QK_K - 4*QK_K/64)/5, with QK_K=256.
+		return 2 + blockSize/64 + (blockSize-4*blockSize/64)/5
+	case tensorTypeTQ2_0:
+		// ggml block_tq2_0 size: sizeof(ggml_half) + QK_K/4, with QK_K=256.
+		return 2 + blockSize/4
 	case tensorTypeIQ2_XXS:
 		return 2 + 2*blockSize/8
 	case tensorTypeIQ2_XS:
@@ -595,7 +602,7 @@ func Decode(rs io.ReadSeeker, maxArraySize int) (*GGML, error) {
 	}, nil
 }
 
-func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheType string, useFlashAttention ml.FlashAttentionType) (kv []uint64, partialOffload, fullOffload uint64) {
+func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheTypeK, kvCacheTypeV string, useFlashAttention ml.FlashAttentionType) (kv []uint64, partialOffload, fullOffload uint64) {
 	context *= uint64(numParallel)
 
 	embedding := f.KV().EmbeddingLength()
@@ -611,7 +618,8 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheType stri
 
 	layers := f.Tensors().GroupLayers()
 
-	bytesPerElement := kvCacheBytesPerElement(kvCacheType)
+	bytesPerElementK := kvCacheBytesPerElement(kvCacheTypeK)
+	bytesPerElementV := kvCacheBytesPerElement(kvCacheTypeV)
 
 	// Default for models unless special-cased below. These defaults mirror the
 	// cache usage in llama.cpp under the assumption that models without special
@@ -633,7 +641,9 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheType stri
 		if headsL > 0 && headsKVL > 0 {
 			// full attention layer
 			// NOTE: Assumes uniform values for all attn layers
-			kv[i] = uint64(float64(context*(embeddingHeadsK+embeddingHeadsV)*headsKVL) * bytesPerElement)
+			kvK := uint64(float64(context*embeddingHeadsK*headsKVL) * bytesPerElementK)
+			kvV := uint64(float64(context*embeddingHeadsV*headsKVL) * bytesPerElementV)
+			kv[i] = kvK + kvV
 			kvSizeAttn += kv[i]
 		} else {
 			// recurrent layer
@@ -847,15 +857,22 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheType stri
 
 // SupportsKVCacheType checks if the requested cache type is supported
 func (f GGML) SupportsKVCacheType(cacheType string) bool {
+	cacheType = normalizeKVCacheType(cacheType)
 	if cacheType == "" || cacheType == "f16" {
 		return true
 	}
 
-	return slices.Contains([]string{"q8_0", "q4_0"}, cacheType)
+	return slices.Contains([]string{
+		"q8_0", "q4_0",
+		"tq1_0", "tq2_0", "tq1", "tq2",
+		"turbo2", "turbo3", "turbo4",
+		"turboquant", "turboquant_google", "google_turboquant",
+	}, cacheType)
 }
 
 // KVCacheTypeIsQuantized checks if the requested cache type is a quantized type
 func (f GGML) KVCacheTypeIsQuantized(cacheType string) bool {
+	cacheType = normalizeKVCacheType(cacheType)
 	if cacheType == "" || cacheType == "f16" || cacheType == "f32" || cacheType == "bf16" {
 		return false
 	}
@@ -906,14 +923,24 @@ func (f GGML) FlashAttention() bool {
 
 // kvCacheBytesPerElement returns the number of bytes per element for a given KV cache type
 func kvCacheBytesPerElement(cacheType string) float64 {
+	cacheType = normalizeKVCacheType(cacheType)
 	switch cacheType {
 	case "q8_0":
 		return 1 // 1/2 of fp16
-	case "q4_0":
+	case "q4_0", "turbo4":
 		return 0.5 // 1/4 of fp16
+	case "tq1", "tq1_0", "turbo2":
+		return 0.2109375 // 54 / 256 bytes per element
+	case "tq2", "tq2_0", "turbo3", "turboquant", "turboquant_google", "google_turboquant":
+		return 0.2578125 // 66 / 256 bytes per element
 	case "f32":
 		return 4 // f32 (default for recurrent)
 	default:
 		return 2 // f16 (default)
 	}
+}
+
+func normalizeKVCacheType(cacheType string) string {
+	cacheType = strings.ToLower(strings.TrimSpace(cacheType))
+	return strings.NewReplacer("-", "_", " ", "_", ".", "_").Replace(cacheType)
 }

@@ -234,6 +234,31 @@ func TestFindCacheSlot(t *testing.T) {
 	}
 }
 
+func TestKVCacheTypeFromStr(t *testing.T) {
+	tests := []struct {
+		in   string
+		want ml.DType
+	}{
+		{in: "", want: ml.DTypeF16},
+		{in: "q8_0", want: ml.DTypeQ80},
+		{in: "q4_0", want: ml.DTypeQ40},
+		{in: "tq1_0", want: ml.DTypeTQ10},
+		{in: "tq2_0", want: ml.DTypeTQ20},
+		{in: "turbo2", want: ml.DTypeTQ10},
+		{in: "turbo3", want: ml.DTypeTQ20},
+		{in: "turbo4", want: ml.DTypeQ40},
+		{in: "turboquant google", want: ml.DTypeTQ20},
+		{in: "google-turboquant", want: ml.DTypeTQ20},
+		{in: "unknown", want: ml.DTypeF16},
+	}
+
+	for _, tt := range tests {
+		if got := kvCacheTypeFromStr(tt.in); got != tt.want {
+			t.Fatalf("kvCacheTypeFromStr(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestShiftDiscard(t *testing.T) {
 	tests := []struct {
 		name     string

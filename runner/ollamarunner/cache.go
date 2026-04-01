@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/ollama/ollama/kvcache"
@@ -59,11 +60,18 @@ func NewInputCache(model model.Model, kvCacheType string, kvSize int32, numSlots
 }
 
 func kvCacheTypeFromStr(s string) ml.DType {
-	switch s {
+	normalized := strings.ToLower(strings.TrimSpace(s))
+	normalized = strings.NewReplacer("-", "_", " ", "_").Replace(normalized)
+
+	switch normalized {
 	case "q8_0":
 		return ml.DTypeQ80
-	case "q4_0":
+	case "q4_0", "turbo4":
 		return ml.DTypeQ40
+	case "tq1_0", "tq1", "turbo2":
+		return ml.DTypeTQ10
+	case "tq2_0", "tq2", "turbo3", "turboquant", "turboquant_google", "google_turboquant":
+		return ml.DTypeTQ20
 	default:
 		return ml.DTypeF16
 	}

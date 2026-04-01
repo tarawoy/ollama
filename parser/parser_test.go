@@ -1041,6 +1041,33 @@ func TestFilesForModel(t *testing.T) {
 			},
 		},
 		{
+			name: "gguf files uppercase extension",
+			setup: func(dir string) error {
+				binaryContent := make([]byte, 512)
+				for i := range binaryContent {
+					binaryContent[i] = byte(i % 256)
+				}
+				files := []string{
+					"model.GGUF",
+					"config.json",
+				}
+				for _, file := range files {
+					content := binaryContent
+					if file == "config.json" {
+						content = []byte(`{"config": true}`)
+					}
+					if err := os.WriteFile(filepath.Join(dir, file), content, 0o644); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+			wantFiles: []string{
+				"model.GGUF",
+				"config.json",
+			},
+		},
+		{
 			name: "bin files as gguf",
 			setup: func(dir string) error {
 				binaryContent := make([]byte, 512)

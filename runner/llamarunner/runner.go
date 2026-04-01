@@ -1,6 +1,7 @@
 package llamarunner
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -832,7 +833,8 @@ func (s *Server) loadModel(
 	lpath []string,
 	ppath string,
 	kvSize int,
-	kvCacheType string,
+	kvCacheTypeK string,
+	kvCacheTypeV string,
 	flashAttention ml.FlashAttentionType,
 	threads int,
 	multiUserCache bool,
@@ -843,7 +845,7 @@ func (s *Server) loadModel(
 		panic(err)
 	}
 
-	ctxParams := llama.NewContextParams(kvSize, s.batchSize, s.parallel, threads, flashAttention, kvCacheType)
+	ctxParams := llama.NewContextParams(kvSize, s.batchSize, s.parallel, threads, flashAttention, kvCacheTypeK, kvCacheTypeV)
 	s.lc, err = llama.NewContextWithModel(s.model, ctxParams)
 	if err != nil {
 		panic(err)
@@ -891,6 +893,8 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	req.KvCacheTypeK = cmp.Or(req.KvCacheTypeK, req.KvCacheType)
+	req.KvCacheTypeV = cmp.Or(req.KvCacheTypeV, req.KvCacheType, req.KvCacheTypeK)
 
 	slog.Info("load", "request", req)
 
@@ -931,7 +935,7 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.status = llm.ServerStatusLoadingModel
-		go s.loadModel(params, s.modelPath, req.LoraPath, req.ProjectorPath, req.KvSize, req.KvCacheType, req.FlashAttention, req.NumThreads, req.MultiUserCache)
+		go s.loadModel(params, s.modelPath, req.LoraPath, req.ProjectorPath, req.KvSize, req.KvCacheTypeK, req.KvCacheTypeV, req.FlashAttention, req.NumThreads, req.MultiUserCache)
 
 	case llm.LoadOperationClose:
 		// No-op for us

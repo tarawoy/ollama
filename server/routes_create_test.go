@@ -941,6 +941,18 @@ func TestDetectModelTypeFromFiles(t *testing.T) {
 		}
 	})
 
+	t.Run("gguf file uppercase extension", func(t *testing.T) {
+		_, digest := createBinFile(t, nil, nil)
+		files := map[string]string{
+			"model.GGUF": digest,
+		}
+
+		modelType := detectModelTypeFromFiles(files)
+		if modelType != "gguf" {
+			t.Fatalf("expected model type 'gguf', got %q", modelType)
+		}
+	})
+
 	t.Run("gguf file w/o extension", func(t *testing.T) {
 		_, digest := createBinFile(t, nil, nil)
 		files := map[string]string{

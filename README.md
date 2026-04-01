@@ -87,6 +87,29 @@ See [ollama.com/library](https://ollama.com/library) for the full list.
 
 See the [quickstart guide](https://docs.ollama.com/quickstart) for more details.
 
+## KV cache quantization
+
+You can reduce KV cache memory usage with environment variables:
+
+- `OLLAMA_KV_CACHE_TYPE` - legacy/global type for both K and V cache.
+- `OLLAMA_KV_CACHE_TYPE_K` - type for K cache (overrides global).
+- `OLLAMA_KV_CACHE_TYPE_V` - type for V cache (overrides global).
+
+If `OLLAMA_KV_CACHE_TYPE_K` and `OLLAMA_KV_CACHE_TYPE_V` are unset, Ollama uses `OLLAMA_KV_CACHE_TYPE` for both.
+
+Supported values:
+
+- `f16`, `q8_0`, `q4_0`
+- `tq1_0` (alias: `turbo2`)
+- `tq2_0` (aliases: `turbo3`, `turboquant`, `turboquant google`)
+- `turbo4` (alias: `q4_0`)
+
+Example asymmetric setup (keep K higher precision, compress V harder):
+
+```shell
+OLLAMA_KV_CACHE_TYPE_K=q8_0 OLLAMA_KV_CACHE_TYPE_V=turbo3 ollama serve
+```
+
 ## REST API
 
 Ollama has a REST API for running and managing models.

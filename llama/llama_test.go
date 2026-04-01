@@ -103,3 +103,33 @@ func TestSchemaToGrammar(t *testing.T) {
 		})
 	}
 }
+
+func TestKVCacheTypeFromStrAliases(t *testing.T) {
+	if got, want := kvCacheTypeFromStr(""), kvCacheTypeFromStr("unknown"); got != want {
+		t.Fatalf("unknown cache type should fall back to default: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("turboquant google"), kvCacheTypeFromStr("tq2_0"); got != want {
+		t.Fatalf("turboquant alias mismatch: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("google-turboquant"), kvCacheTypeFromStr("tq2_0"); got != want {
+		t.Fatalf("google-turboquant alias mismatch: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("tq1"), kvCacheTypeFromStr("tq1_0"); got != want {
+		t.Fatalf("tq1 alias mismatch: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("turbo2"), kvCacheTypeFromStr("tq1_0"); got != want {
+		t.Fatalf("turbo2 alias mismatch: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("turbo3"), kvCacheTypeFromStr("tq2_0"); got != want {
+		t.Fatalf("turbo3 alias mismatch: got %v want %v", got, want)
+	}
+
+	if got, want := kvCacheTypeFromStr("turbo4"), kvCacheTypeFromStr("q4_0"); got != want {
+		t.Fatalf("turbo4 alias mismatch: got %v want %v", got, want)
+	}
+}

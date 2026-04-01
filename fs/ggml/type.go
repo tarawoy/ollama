@@ -55,7 +55,11 @@ const (
 // ParseFileType parses the provided GGUF file type
 // Only Ollama supported types are considered valid
 func ParseFileType(s string) (FileType, error) {
-	switch s {
+	// Normalize input and accept compatibility aliases used by external tooling.
+	normalized := strings.ToUpper(strings.TrimSpace(s))
+	normalized = strings.NewReplacer("-", "_", " ", "_", ".", "_").Replace(normalized)
+
+	switch normalized {
 	case "F32":
 		return FileTypeF32, nil
 	case "F16":
@@ -68,6 +72,10 @@ func ParseFileType(s string) (FileType, error) {
 		return FileTypeQ4_K_M, nil
 	case "BF16":
 		return FileTypeBF16, nil
+	case "TQ1", "TQ1_0":
+		return fileTypeTQ1_0, nil
+	case "TQ2", "TQ2_0", "TURBOQUANT", "TURBO_QUANT", "TURBOQUANT_GOOGLE", "GOOGLE_TURBOQUANT":
+		return fileTypeTQ2_0, nil
 	default:
 		supportedFileTypes := []FileType{
 			FileTypeF32,
@@ -75,6 +83,8 @@ func ParseFileType(s string) (FileType, error) {
 			FileTypeQ4_K_S,
 			FileTypeQ4_K_M,
 			FileTypeQ8_0,
+			fileTypeTQ1_0,
+			fileTypeTQ2_0,
 			// fsggml.FileTypeBF16, // TODO
 		}
 		strs := make([]string, len(supportedFileTypes))
@@ -127,6 +137,10 @@ func (t FileType) String() string {
 		return "Q2_K_S"
 	case FileTypeBF16:
 		return "BF16"
+	case fileTypeTQ1_0:
+		return "TQ1_0"
+	case fileTypeTQ2_0:
+		return "TQ2_0"
 	default:
 		return "unknown"
 	}
@@ -176,6 +190,10 @@ func (ftype FileType) ToTensorType() TensorType {
 		return TensorTypeBF16
 	case fileTypeMXFP4:
 		return TensorTypeMXFP4
+	case fileTypeTQ1_0:
+		return tensorTypeTQ1_0
+	case fileTypeTQ2_0:
+		return tensorTypeTQ2_0
 	default:
 		slog.Warn("unsupported file type", "type", ftype)
 		return 0 // F32
@@ -232,7 +250,10 @@ const (
 // ParseTensorType parses the provided GGUF tensor type
 // Only Ollama supported types are considered valid
 func ParseTensorType(s string) (TensorType, error) {
-	switch s {
+	normalized := strings.ToUpper(strings.TrimSpace(s))
+	normalized = strings.NewReplacer("-", "_", " ", "_", ".", "_").Replace(normalized)
+
+	switch normalized {
 	case "F32":
 		return TensorTypeF32, nil
 	case "F16":
@@ -267,6 +288,10 @@ func ParseTensorType(s string) (TensorType, error) {
 		return TensorTypeBF16, nil
 	case "MXFP4":
 		return TensorTypeMXFP4, nil
+	case "TQ1", "TQ1_0":
+		return tensorTypeTQ1_0, nil
+	case "TQ2", "TQ2_0", "TURBOQUANT", "TURBOQUANT_GOOGLE", "GOOGLE_TURBOQUANT":
+		return tensorTypeTQ2_0, nil
 	default:
 		return 0, fmt.Errorf("unsupported quantization type %s", s)
 	}
@@ -321,6 +346,10 @@ func (t TensorType) String() string {
 		return "BF16"
 	case 4, TensorTypeMXFP4:
 		return "MXFP4"
+	case tensorTypeTQ1_0:
+		return "TQ1_0"
+	case tensorTypeTQ2_0:
+		return "TQ2_0"
 	default:
 		return "unknown"
 	}

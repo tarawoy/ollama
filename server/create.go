@@ -355,9 +355,10 @@ func convertModelFromFiles(files map[string]string, baseLayers []*layerGGML, isA
 
 func detectModelTypeFromFiles(files map[string]string) string {
 	for fn := range files {
-		if strings.HasSuffix(fn, ".safetensors") {
+		lowerFn := strings.ToLower(fn)
+		if strings.HasSuffix(lowerFn, ".safetensors") {
 			return "safetensors"
-		} else if strings.HasSuffix(fn, ".gguf") {
+		} else if strings.HasSuffix(lowerFn, ".gguf") {
 			return "gguf"
 		} else {
 			// try to see if we can find a gguf file even without the file extension

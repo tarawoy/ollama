@@ -2,6 +2,7 @@ package ollamarunner
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1178,7 +1179,8 @@ func (s *Server) allocModel(
 	params ml.BackendParams,
 	loraPath []string,
 	parallel int,
-	kvCacheType string,
+	kvCacheTypeK string,
+	kvCacheTypeV string,
 	kvSize int,
 	multiUserCache bool,
 ) (panicErr error) {
@@ -1220,7 +1222,8 @@ func (s *Server) allocModel(
 		}
 	}
 
-	s.cache, err = NewInputCache(s.model, kvCacheType, int32(kvSize), parallel, s.batchSize, multiUserCache)
+	cacheType := cmp.Or(kvCacheTypeV, kvCacheTypeK)
+	s.cache, err = NewInputCache(s.model, cacheType, int32(kvSize), parallel, s.batchSize, multiUserCache)
 	if err != nil {
 		return err
 	}
@@ -1280,6 +1283,8 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	req.KvCacheTypeK = cmp.Or(req.KvCacheTypeK, req.KvCacheType)
+	req.KvCacheTypeV = cmp.Or(req.KvCacheTypeV, req.KvCacheType, req.KvCacheTypeK)
 
 	slog.Info("load", "request", req)
 
@@ -1308,7 +1313,7 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 		s.batchSize = req.BatchSize
 
-		err := s.allocModel(s.modelPath, params, req.LoraPath, req.Parallel, req.KvCacheType, req.KvSize, req.MultiUserCache)
+		err := s.allocModel(s.modelPath, params, req.LoraPath, req.Parallel, req.KvCacheTypeK, req.KvCacheTypeV, req.KvSize, req.MultiUserCache)
 		if err != nil {
 			s.closeModel()
 

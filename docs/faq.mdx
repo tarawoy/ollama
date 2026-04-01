@@ -349,20 +349,33 @@ Flash Attention is a feature of most modern models that can significantly reduce
 
 The K/V context cache can be quantized to significantly reduce memory usage when Flash Attention is enabled.
 
-To use quantized K/V cache with Ollama you can set the following environment variable:
+To use quantized K/V cache with Ollama you can set the following environment variables:
 
 - `OLLAMA_KV_CACHE_TYPE` - The quantization type for the K/V cache. Default is `f16`.
+- `OLLAMA_KV_CACHE_TYPE_K` - The quantization type for the K cache. Overrides `OLLAMA_KV_CACHE_TYPE` when set.
+- `OLLAMA_KV_CACHE_TYPE_V` - The quantization type for the V cache. Overrides `OLLAMA_KV_CACHE_TYPE` when set.
 
 <Note>
   Currently this is a global option - meaning all models will run with the
   specified quantization type.
 </Note>
 
-The currently available K/V cache quantization types are:
+If `OLLAMA_KV_CACHE_TYPE_K` and `OLLAMA_KV_CACHE_TYPE_V` are not set, Ollama falls back to `OLLAMA_KV_CACHE_TYPE` for both.
+
+The currently available K/V cache quantization types and aliases are:
 
 - `f16` - high precision and memory usage (default).
 - `q8_0` - 8-bit quantization, uses approximately 1/2 the memory of `f16` with a very small loss in precision, this usually has no noticeable impact on the model's quality (recommended if not using f16).
 - `q4_0` - 4-bit quantization, uses approximately 1/4 the memory of `f16` with a small-medium loss in precision that may be more noticeable at higher context sizes.
+- `tq1_0` (alias: `turbo2`) - ternary cache quantization with higher compression than `q4_0`.
+- `tq2_0` (aliases: `turbo3`, `turboquant`, `turboquant google`) - ternary cache quantization tuned for stronger quality/compression balance.
+- `turbo4` - alias of `q4_0`.
+
+Example asymmetric configuration:
+
+```shell
+OLLAMA_KV_CACHE_TYPE_K=q8_0 OLLAMA_KV_CACHE_TYPE_V=turbo3 ollama serve
+```
 
 How much the cache quantization impacts the model's response quality will depend on the model and the task. Models that have a high GQA count (e.g. Qwen2) may see a larger impact on precision from quantization than models with a low GQA count.
 

@@ -326,7 +326,7 @@ func Dump(ctx Context, t Tensor, optsFuncs ...DumpOptions) string {
 		return dump[[]float32](ctx, t, opts.EdgeItems, func(f float32) string {
 			return strconv.FormatFloat(float64(f), 'f', opts.Precision, 32)
 		})
-	case DTypeF16, DTypeQ80, DTypeQ40:
+	case DTypeF16, DTypeQ80, DTypeQ40, DTypeTQ10, DTypeTQ20:
 		f32 := ctx.Input().Empty(DTypeF32, t.Shape()...)
 		f32 = t.Copy(ctx, f32)
 		return dump[[]float32](ctx, f32, opts.EdgeItems, func(f float32) string {
@@ -402,6 +402,8 @@ const (
 	DTypeF16
 	DTypeQ80
 	DTypeQ40
+	DTypeTQ10
+	DTypeTQ20
 	DTypeI32
 	DTypeMXFP4
 )

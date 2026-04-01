@@ -211,6 +211,8 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 	}
 
 	kvct := strings.ToLower(envconfig.KvCacheType())
+	kvctk := strings.ToLower(cmp.Or(envconfig.KvCacheTypeK(), kvct))
+	kvctv := strings.ToLower(cmp.Or(envconfig.KvCacheTypeV(), kvct))
 
 	if tok == nil {
 		flashAttention := ml.FlashAttentionAuto
@@ -222,23 +224,40 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 			}
 		}
 
-		if kvct != "" {
-			if f.KVCacheTypeIsQuantized(kvct) {
+		if kvctk != "" || kvctv != "" {
+			quantizedK := f.KVCacheTypeIsQuantized(kvctk)
+			quantizedV := f.KVCacheTypeIsQuantized(kvctv)
+			if quantizedK || quantizedV {
 				if flashAttention != ml.FlashAttentionEnabled {
-					slog.Warn("OLLAMA_FLASH_ATTENTION must be enabled to use a quantized OLLAMA_KV_CACHE_TYPE", "type", kvct)
+					slog.Warn("OLLAMA_FLASH_ATTENTION must be enabled to use quantized OLLAMA_KV_CACHE_TYPE_K/OLLAMA_KV_CACHE_TYPE_V", "type_k", kvctk, "type_v", kvctv)
 					loadRequest.KvCacheType = ""
-				} else if f.SupportsKVCacheType(kvct) {
-					loadRequest.KvCacheType = kvct
+					loadRequest.KvCacheTypeK = ""
+					loadRequest.KvCacheTypeV = ""
 				} else {
-					slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE", "type", kvct)
+					if f.SupportsKVCacheType(kvctk) {
+						loadRequest.KvCacheTypeK = kvctk
+					} else {
+						slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE_K", "type", kvctk)
+					}
+					if f.SupportsKVCacheType(kvctv) {
+						loadRequest.KvCacheTypeV = kvctv
+					} else {
+						slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE_V", "type", kvctv)
+					}
 				}
 			} else {
-				if f.SupportsKVCacheType(kvct) {
-					loadRequest.KvCacheType = kvct
+				if f.SupportsKVCacheType(kvctk) {
+					loadRequest.KvCacheTypeK = kvctk
 				} else {
-					slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE", "type", kvct)
+					slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE_K", "type", kvctk)
+				}
+				if f.SupportsKVCacheType(kvctv) {
+					loadRequest.KvCacheTypeV = kvctv
+				} else {
+					slog.Warn("unsupported OLLAMA_KV_CACHE_TYPE_V", "type", kvctv)
 				}
 			}
+			loadRequest.KvCacheType = cmp.Or(loadRequest.KvCacheTypeV, loadRequest.KvCacheTypeK)
 		}
 		loadRequest.FlashAttention = flashAttention
 	} else {
@@ -249,13 +268,19 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 
 			// Flash Attention also supports kv cache quantization
 			// Enable if the requested and kv cache type is supported by the model
-			if f.SupportsKVCacheType(kvct) {
-				loadRequest.KvCacheType = kvct
+			if f.SupportsKVCacheType(kvctk) {
+				loadRequest.KvCacheTypeK = kvctk
 			} else {
-				slog.Warn("kv cache type not supported by model", "type", kvct)
+				slog.Warn("kv cache type K not supported by model", "type", kvctk)
 			}
-		} else if kvct != "" && kvct != "f16" {
-			slog.Warn("quantized kv cache requested but flash attention disabled", "type", kvct)
+			if f.SupportsKVCacheType(kvctv) {
+				loadRequest.KvCacheTypeV = kvctv
+			} else {
+				slog.Warn("kv cache type V not supported by model", "type", kvctv)
+			}
+			loadRequest.KvCacheType = cmp.Or(loadRequest.KvCacheTypeV, loadRequest.KvCacheTypeK)
+		} else if (kvctk != "" && kvctk != "f16") || (kvctv != "" && kvctv != "f16") {
+			slog.Warn("quantized kv cache requested but flash attention disabled", "type_k", kvctk, "type_v", kvctv)
 		}
 	}
 
@@ -478,6 +503,8 @@ type LoadRequest struct {
 	FlashAttention ml.FlashAttentionType
 	KvSize         int
 	KvCacheType    string
+	KvCacheTypeK   string
+	KvCacheTypeV   string
 	NumThreads     int
 	GPULayers      ml.GPULayersList
 	MultiUserCache bool
@@ -522,7 +549,7 @@ func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, system
 	}
 
 	kv, graphPartialOffload, graphFullOffload := s.ggml.GraphSize(uint64(s.options.NumCtx), uint64(s.loadRequest.BatchSize),
-		s.loadRequest.Parallel, s.loadRequest.KvCacheType, s.loadRequest.FlashAttention)
+		s.loadRequest.Parallel, s.loadRequest.KvCacheTypeK, s.loadRequest.KvCacheTypeV, s.loadRequest.FlashAttention)
 
 	// Use the size of one layer as a buffer
 	layers := s.ggml.Tensors().GroupLayers()

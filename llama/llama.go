@@ -119,7 +119,7 @@ type ContextParams struct {
 	c C.struct_llama_context_params
 }
 
-func NewContextParams(numCtx int, batchSize int, numSeqMax int, threads int, flashAttention ml.FlashAttentionType, kvCacheType string) ContextParams {
+func NewContextParams(numCtx int, batchSize int, numSeqMax int, threads int, flashAttention ml.FlashAttentionType, kvCacheTypeK, kvCacheTypeV string) ContextParams {
 	params := C.llama_context_default_params()
 	params.n_ctx = C.uint(numCtx)
 	params.n_batch = C.uint(batchSize * numSeqMax)
@@ -136,23 +136,29 @@ func NewContextParams(numCtx int, batchSize int, numSeqMax int, threads int, fla
 	case ml.FlashAttentionAuto:
 		params.flash_attn_type = int32(C.LLAMA_FLASH_ATTN_TYPE_AUTO)
 	}
-	params.type_k = kvCacheTypeFromStr(strings.ToLower(kvCacheType))
-	params.type_v = kvCacheTypeFromStr(strings.ToLower(kvCacheType))
+	params.type_k = kvCacheTypeFromStr(strings.ToLower(kvCacheTypeK))
+	params.type_v = kvCacheTypeFromStr(strings.ToLower(kvCacheTypeV))
 
 	return ContextParams{c: params}
 }
 
 // kvCacheTypeFromStr converts a string cache type to the corresponding GGML type value
 func kvCacheTypeFromStr(s string) C.enum_ggml_type {
-	if s == "" {
+	normalized := strings.ToLower(strings.TrimSpace(s))
+	normalized = strings.NewReplacer("-", "_", " ", "_").Replace(normalized)
+	if normalized == "" {
 		return C.GGML_TYPE_F16
 	}
 
-	switch s {
+	switch normalized {
 	case "q8_0":
 		return C.GGML_TYPE_Q8_0
-	case "q4_0":
+	case "q4_0", "turbo4":
 		return C.GGML_TYPE_Q4_0
+	case "tq1_0", "tq1", "turbo2":
+		return C.GGML_TYPE_TQ1_0
+	case "tq2_0", "tq2", "turbo3", "turboquant", "turboquant_google", "google_turboquant":
+		return C.GGML_TYPE_TQ2_0
 	default:
 		return C.GGML_TYPE_F16
 	}

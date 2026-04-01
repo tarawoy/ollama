@@ -292,6 +292,9 @@ func filesForModel(path string) ([]string, error) {
 	} else if gg, _ := glob(filepath.Join(path, "*.gguf"), "application/octet-stream"); len(gg) > 0 {
 		// covers gguf files ending in .gguf
 		files = append(files, gg...)
+	} else if gg, _ := glob(filepath.Join(path, "*.GGUF"), "application/octet-stream"); len(gg) > 0 {
+		// covers gguf files ending in .GGUF
+		files = append(files, gg...)
 	} else if gg, _ := glob(filepath.Join(path, "*.bin"), "application/octet-stream"); len(gg) > 0 {
 		// covers gguf files ending in .bin
 		files = append(files, gg...)
